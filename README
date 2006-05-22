@@ -1,4 +1,4 @@
-Math::SymbolicX::Statistics::Distributions version 1.01
+Math::SymbolicX::Statistics::Distributions version 1.02
 =======================================================
 
 This module offers easy access to formulas for a few often-used
@@ -34,7 +34,7 @@ COPYRIGHT AND LICENCE
 
 Put the correct copyright and licence information here.
 
-Copyright (C) 2005 by Steffen Mueller
+Copyright (C) 2005, 2006 by Steffen Mueller
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.6.0 or,

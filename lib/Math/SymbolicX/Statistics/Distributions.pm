@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 use Math::Symbolic qw/parse_from_string/;
 use Carp qw/confess cluck/;
@@ -27,6 +27,9 @@ Math::SymbolicX::Statistics::Distributions - Statistical Distributions
   #####################################################
   # The following demonstrates the procedural interface
   
+  # (included in :all)
+  use Math::SymbolicX::Statistics::Distributions ':functions';
+  
   $dist = normal_distribution('mean', 'rmsd');
   print $dist->value(mean => 5, rmsd => 2, x => 1);
   
@@ -48,6 +51,8 @@ Math::SymbolicX::Statistics::Distributions - Statistical Distributions
   # The following demonstrates the parser/grammar interface
   # We'll do the exact same as above with the other interface.  
   
+  # (included in :all)
+  use Math::SymbolicX::Statistics::Distributions ':grammar';
   use Math::Symbolic qw/parse_from_string/;
   
   $dist = parse_from_string('normal()');
@@ -66,6 +71,8 @@ Math::SymbolicX::Statistics::Distributions - Statistical Distributions
   # To generate the error function: (mean = 0; rmsd = 1)
   $dist = parse_from_string('normal(0, 1)');
   print $dist->value(x => 1);
+  
+  # same works for the keywords 'boltzmann', 'bose', 'fermi'
 
 =head1 DESCRIPTION
 
@@ -128,9 +135,13 @@ above.
   gauss_grammar
   bivariate_normal_grammar
   cauchy_grammar
+  boltzmann_grammar
+  bose_grammar
+  fermi_grammar
 
-To add all the keywords (C<normal()>, C<gauss()>, C<bivariate_normal()>
-and C<cauchy()> to the grammar, you can specify C<:grammar> instead.
+To add all the keywords (C<normal()>, C<gauss()>, C<bivariate_normal()>,
+C<cauchy()>, C<boltzmann()>, C<bose()>, and C<fermi()>
+to the grammar, you can specify C<:grammar> instead.
 
 Finally, the module supports the exporter tag C<:all> to both export
 all functions and add all keywords to the parser.
@@ -378,6 +389,172 @@ details.
 
 
 
+=item Boltzmann Distribution
+
+Boltzmann distributions are availlable through the function
+C<boltzmann_distribution>.
+The function returns the Math::Symbolic representation of a
+Boltzmann distribution.
+
+The Boltzmann distribution has four parameters:
+The energy C<E>,
+the weighting factor C<gs> that describes the number of states at
+energy C<E>, the temperature C<T>,
+and the chemical potential C<mu>.
+
+The function takes fouroptional arguments: The Math::Symbolic trees
+(or strings) to be plugged into the formula for
+1) C<E>,
+2) C<gs>,
+3) C<T>, and
+4) C<mu>
+
+If any argument is undefined or omitted, the corresponding variable will
+remain unchanged.
+
+The formula used is: C<N = gs * e^(-(E-mu)/(k_B*T))>.
+
+Please refer to the literature referenced in the SEE ALSO section for 
+details. Boltzmann's constant C<k_B> is used as C<1.3807 * 10^-23 J/K>.
+
+=cut
+
+{
+	my $parsed;
+	sub boltzmann_distribution {
+		my ($E, $gs, $T, $mu) = @_;
+		$E  = 'E'       if not defined $E;
+		$gs = 'gs'      if not defined $gs;
+		$T  = 'T'       if not defined $T;
+		$mu = 'mu'      if not defined $mu;
+		
+		# parse arguments
+		$E     = _parse_arguments($E    , 'E'        );
+		$gs    = _parse_arguments($gs   , 'gs'       );
+		$T     = _parse_arguments($T    , 'T'        );
+		$mu    = _parse_arguments($mu   , 'mu'       );
+		
+		# Generate the template object tree
+		if (not defined $parsed) {
+			$parsed = parse_from_string(<<'HERE');
+gs /
+e ^ (
+	(E - mu) / (k_B * T)
+)
+HERE
+			
+			# Implement special numbers
+			$parsed->implement(
+				e  => Math::Symbolic::Constant->euler(),
+#				pi => Math::Symbolic::Constant->pi(),
+				k_B => Math::Symbolic::Constant->new(1.3807e-23),
+			);
+		}
+
+		# Always return a clone of the template object tree.
+		my $distribution = $parsed->new();
+		
+
+		# Implement specified variables in a separate step in case
+		# they contain e's and pi's.
+		$distribution->implement(
+			E  => $E,
+			gs => $gs,
+			T  => $T,
+			mu => $mu,
+		);
+		
+		return $distribution;
+	}
+}
+
+
+
+=item Fermi Distribution
+
+Fermi distributions are availlable through the function
+C<fermi_distribution>.
+The function returns the Math::Symbolic representation of a
+Fermi distribution.
+
+The Fermi distribution has four parameters:
+The energy C<E>,
+the weighting factor C<gs> that describes the number of states at
+energy C<E>, the temperature C<T>,
+and the chemical potential C<mu>.
+
+The function takes fouroptional arguments: The Math::Symbolic trees
+(or strings) to be plugged into the formula for
+1) C<E>,
+2) C<gs>,
+3) C<T>, and
+4) C<mu>
+
+If any argument is undefined or omitted, the corresponding variable will
+remain unchanged.
+
+The formula used is: C<N = gs / ( e^((E-mu)/(k_B*T)) + 1)>.
+
+Please refer to the literature referenced in the SEE ALSO section for 
+details. Boltzmann's constant C<k_B> is used as C<1.3807 * 10^-23 J/K>.
+
+=cut
+
+{
+	my $parsed;
+	sub fermi_distribution {
+		my ($E, $gs, $T, $mu) = @_;
+		$E  = 'E'       if not defined $E;
+		$gs = 'gs'      if not defined $gs;
+		$T  = 'T'       if not defined $T;
+		$mu = 'mu'      if not defined $mu;
+		
+		# parse arguments
+		$E     = _parse_arguments($E    , 'E'        );
+		$gs    = _parse_arguments($gs   , 'gs'       );
+		$T     = _parse_arguments($T    , 'T'        );
+		$mu    = _parse_arguments($mu   , 'mu'       );
+		
+		# Generate the template object tree
+		if (not defined $parsed) {
+			$parsed = parse_from_string(<<'HERE');
+gs /
+(
+	e ^ (
+		(E - mu) / (k_B * T)
+	)
+	+ 1
+)
+HERE
+			
+			# Implement special numbers
+			$parsed->implement(
+				e  => Math::Symbolic::Constant->euler(),
+#				pi => Math::Symbolic::Constant->pi(),
+				k_B => Math::Symbolic::Constant->new(1.3807e-23),
+			);
+		}
+
+		# Always return a clone of the template object tree.
+		my $distribution = $parsed->new();
+		
+
+		# Implement specified variables in a separate step in case
+		# they contain e's and pi's.
+		$distribution->implement(
+			E  => $E,
+			gs => $gs,
+			T  => $T,
+			mu => $mu,
+		);
+		
+		return $distribution;
+	}
+}
+
+
+
+
 
 
 
@@ -414,12 +591,18 @@ our %EXPORT_TAGS = (
 		normal_distribution
 		bivariate_normal_distribution
 		cauchy_distribution
+		boltzmann_distribution
+		bose_distribution
+		fermi_distribution
 		) ],
 	'functions' => [ qw(
 		gauss_distribution
 		normal_distribution
 		bivariate_normal_distribution
 		cauchy_distribution
+		boltzmann_distribution
+		bose_distribution
+		fermi_distribution
 		) ],
 );
 
@@ -430,6 +613,9 @@ my %GRAMMAR_EXTENSIONS = (
 		normal_grammar => {name => 'normal', args => 2, function => \&gauss_distribution},
 		bivariate_normal_grammar => {name => 'bivariate_normal', args => 5, function => \&bivariate_normal_distribution},
 		cauchy_grammar => {name => 'cauchy', args => 2, function => \&cauchy_distribution},
+		boltzmann_grammar => {name => 'boltzmann', args => 4, function => \&boltzmann_distribution},
+		bose_grammar => {name => 'bose', args => 4, function => \&bose_distribution},
+		fermi_grammar => {name => 'fermi', args => 4, function => \&fermi_distribution},
 );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -558,7 +744,7 @@ L<Math::SymbolicX::ParserExtensionFactory> and all associated modules.
 New versions of this module can be found on
 http://steffen-mueller.net or CPAN. 
 
-Details on the distributions implemented in the code can be found on
+Details on several distributions implemented in the code can be found on
 the MathWorld site:
 
 I<Eric W. Weisstein. "Normal Distribution." From MathWorld --
@@ -570,16 +756,19 @@ A Wolfram Web Resource. http://mathworld.wolfram.com/BivariateNormalDistribution
 I<Eric W. Weisstein. "Cauchy Distribution." From MathWorld --
 A Wolfram Web Resource. http://mathworld.wolfram.com/CauchyDistribution.html>
 
+The Boltzmann, Bose, and Fermi distributions are discussed in detail in 
+I<N.W. Ashcroft, N.D. Mermin. "Solid State Physics". Brooks/Cole, 1976>
+
 =head1 AUTHOR
 
 Steffen Mueller, E<lt>symbolic-module at steffen-mueller dot netE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2005 by Steffen Mueller
+Copyright (C) 2005, 2006 by Steffen Mueller
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.6.1 or,
+it under the same terms as Perl itself, either Perl version 5.6.0 or,
 at your option, any later version of Perl 5 you may have available.
 
 
